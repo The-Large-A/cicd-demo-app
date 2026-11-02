@@ -48,6 +48,7 @@
           - git
           - curl
           - python3-venv
+          - acl              # lets Ansible run tasks as the jenkins user (become_user)
           - docker.io
           - docker-buildx
         update_cache: true
