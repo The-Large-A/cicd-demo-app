@@ -79,8 +79,12 @@ Everything below runs in **Azure Cloud Shell** (portal → `>_` icon → Bash). 
    bash azure/setup.sh <your-public-ip>
    ```
 
-   This creates the budget alert, ACR, AKS, the Jenkins VM and its firewall, and writes the
-   files Jenkins needs to `~/cicd-outputs/`. It takes about 10–15 minutes.
+   It first runs `azure/preflight.sh`, a read-only check that your subscription allows
+   everything (region, VM size, vCPU and public-IP quotas, policies, your Owner role, Ubuntu
+   image, AKS) and stops before creating anything if not. Then it creates the budget alert,
+   ACR, AKS, the Jenkins VM and its firewall, and writes the files Jenkins needs to
+   `~/cicd-outputs/`. It takes about 10–15 minutes. You can run `bash azure/preflight.sh` on
+   its own at any time.
 
 2. **Configure Jenkins with Ansible** (asks you to choose the Jenkins admin password):
 

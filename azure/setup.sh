@@ -16,54 +16,14 @@ read -rp "Create the CI/CD resources here? [y/N] " answer
 [[ "$answer" =~ ^[Yy]$ ]] || exit 1
 mkdir -p "$OUT_DIR" && chmod 700 "$OUT_DIR"
 
-step "Check the region is allowed (Azure for Students limits regions)"
-allowed="$(az policy assignment list --query "[].parameters.listOfAllowedLocations.value[]" -o tsv 2>/dev/null | sort -u | tr '\n' ' ')"
-if [[ -n "$allowed" && " $allowed " != *" $LOCATION "* ]]; then
-  echo "Region $LOCATION is not allowed. Allowed: $allowed" >&2
-  echo "Re-run with: LOCATION=<one of those> bash azure/setup.sh $MY_IP" >&2
-  exit 1
-fi
-info "OK${allowed:+ (allowed: $allowed)}"
-
 step "Register the resource providers"
 for provider in Microsoft.Compute Microsoft.Network Microsoft.ContainerService Microsoft.ContainerRegistry; do
   az provider register -n "$provider" --wait
   info "$provider"
 done
 
-if ! quietly az aks show -g "$RG" -n "$AKS_NAME"; then
-  step "Check the VM size is allowed and the vCPU quota (2 for the AKS node + 2 for the Jenkins VM)"
-  declare -A need=([cores]=4)
-  for size in "$NODE_SIZE" "$VM_SIZE"; do
-    sku="$(az vm list-skus -l "$LOCATION" --size "$size" --resource-type virtualMachines -o json |
-      jq -c --arg s "$size" '[.[] | select(.name == $s)][0] // empty')"
-    if [[ -z "$sku" ]]; then
-      echo "VM size $size is not offered in $LOCATION. Change NODE_SIZE/VM_SIZE in azure/common.sh." >&2
-      exit 1
-    fi
-    blocked="$(jq -r '[.restrictions[]?.reasonCode] | join(",")' <<< "$sku")"
-    if [[ -n "$blocked" ]]; then
-      echo "VM size $size is restricted for this subscription in $LOCATION ($blocked)." >&2
-      exit 1
-    fi
-    family="$(jq -r '.family' <<< "$sku")"
-    need[$family]=$(( ${need[$family]:-0} + 2 ))
-  done
-  usage="$(az vm list-usage -l "$LOCATION" -o json)"
-  for quota in "${!need[@]}"; do
-    used="$(jq -r --arg q "$quota" '.[] | select(.name.value == $q) | .currentValue' <<< "$usage")"
-    limit="$(jq -r --arg q "$quota" '.[] | select(.name.value == $q) | .limit' <<< "$usage")"
-    if [[ ! "$used" =~ ^[0-9]+$ || ! "$limit" =~ ^[0-9]+$ ]]; then
-      echo "Could not read the '$quota' quota for $LOCATION." >&2
-      exit 1
-    fi
-    info "$quota: $used of $limit vCPUs in use (need ${need[$quota]} free)"
-    if (( limit - used < need[$quota] )); then
-      echo "Not enough '$quota' vCPU quota in $LOCATION. Pick another region." >&2
-      exit 1
-    fi
-  done
-fi
+# Stop before creating anything if the subscription would block a later step
+bash "$REPO_ROOT/azure/preflight.sh"
 
 step "Resource group"
 az group create -n "$RG" -l "$LOCATION" -o none
