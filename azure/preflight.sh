@@ -17,7 +17,7 @@ quietly az vm show -g "$RG" -n "$VM_NAME" && VM_EXISTS=true
 
 step "Subscription and permissions"
 account="$(az account show -o json)"
-info "Subscription: $(jq -r .name <<< "$account")  ($(jq -r '.subscriptionPolicies.quotaId // "unknown offer"' <<< "$account"))"
+info "Subscription: $(jq -r .name <<< "$account")"
 info "Signed in as: $(jq -r .user.name <<< "$account")"
 user_id="$(az ad signed-in-user show --query id -o tsv 2>/dev/null || true)"
 roles=""
@@ -124,7 +124,9 @@ own_ips="$(az network public-ip list -o json |
   jq --arg rg "$(tr '[:upper:]' '[:lower:]' <<< "$RG")" '[.[] | select(.resourceGroup | ascii_downcase | contains($rg))] | length')"
 need_ips=$(( own_ips >= 3 ? 0 : 3 - own_ips ))
 net_usage="$(az network list-usages -l "$LOCATION" -o json)"
-ip_rows="$(jq -c '.[] | select(.name.value | test("PublicIPAddresses$"; "i"))' <<< "$net_usage")"
+# Only the total and the Standard IPv4 quota matter: AKS and az vm create use Standard IPv4.
+# (Basic, IPv6, Global Tier and Routing Preference quotas are often 0 on student plans.)
+ip_rows="$(jq -c '.[] | select(.name.localizedValue | test("^Public IP Addresses$|^Public IPv4 Addresses - Standard$"; "i"))' <<< "$net_usage")"
 if [[ -z "$ip_rows" ]]; then
   warn "Could not read the public IP quota"
 fi
