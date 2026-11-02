@@ -141,6 +141,8 @@ page within a few minutes, with no downtime (rolling update, `maxUnavailable: 0`
 | App rate limit: 60 requests/minute per client IP (HTTP 429 beyond that) | `RateLimitFilter.java` |
 
 Start a work session with `bash azure/start.sh` and end it with `bash azure/stop.sh`.
+`bash azure/check.sh` is a read-only health check of everything the project keeps in Azure,
+Kubernetes and Jenkins; it works whether things are running or stopped.
 After the viva, `bash azure/teardown.sh` deletes everything.
 
 ## Security

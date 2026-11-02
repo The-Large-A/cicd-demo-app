@@ -33,6 +33,13 @@ step() { printf '\n\e[1;33m# %s\e[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 quietly() { "$@" >/dev/null 2>&1; }
 
+# Result helpers for the read-only checks (preflight.sh, check.sh)
+FAILS=0
+WARNS=0
+pass() { printf '  \e[32mPASS\e[0m  %s\n' "$*"; }
+warn() { printf '  \e[33mWARN\e[0m  %s\n' "$*"; WARNS=$((WARNS + 1)); }
+fail() { printf '  \e[31mFAIL\e[0m  %s\n' "$*"; FAILS=$((FAILS + 1)); }
+
 require_ip() {
   if [[ ! "${1:-}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
     echo "Pass your laptop's public IPv4 address (open https://api.ipify.org in your browser)." >&2
