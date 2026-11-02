@@ -143,6 +143,9 @@ page within a few minutes, with no downtime (rolling update, `maxUnavailable: 0`
 Start a work session with `bash azure/start.sh` and end it with `bash azure/stop.sh`.
 `bash azure/check.sh` is a read-only health check of everything the project keeps in Azure,
 Kubernetes and Jenkins; it works whether things are running or stopped.
+To stop anything being deleted by accident, lock the resource group (stop/start and deploys
+still work; `teardown.sh` removes the lock for you):
+`az lock create --name keep-project --resource-group rg-cicd-demo --lock-type CanNotDelete`.
 After the viva, `bash azure/teardown.sh` deletes everything.
 
 ## Security

@@ -9,7 +9,7 @@ if ! quietly az group show -n "$RG"; then
   fail "Resource group $RG does not exist - run azure/setup.sh"
   exit 1
 fi
-az resource list -g "$RG" --query "sort_by(@, &type)[].{type: type, name: name}" -o table
+az resource list -g "$RG" --query "sort_by(@, &type)[].{Resource: type, Name: name}" -o table
 
 if acr="$(az acr show -n "$ACR_NAME" -o json 2>/dev/null)"; then
   pass "Container registry $(jq -r .loginServer <<< "$acr") ($(jq -r .sku.name <<< "$acr"))"
@@ -72,6 +72,14 @@ if [[ -n "$schedule" && "$(jq -r .properties.status <<< "$schedule")" == "Enable
   pass "VM auto-shutdown enabled at $(jq -r .properties.dailyRecurrence.time <<< "$schedule") $(jq -r .properties.timeZoneId <<< "$schedule")"
 else
   fail "VM auto-shutdown is not enabled"
+fi
+
+locks="$(az lock list -g "$RG" --query "[].name" -o tsv 2>/dev/null | tr '
+' ' ' || true)"
+if [[ -n "${locks// /}" ]]; then
+  pass "Delete lock on $RG: $locks(resources cannot be deleted by accident)"
+else
+  info "No delete lock on $RG (optional, see README)"
 fi
 
 if budget="$(az rest --method get -o json \
