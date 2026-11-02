@@ -33,12 +33,21 @@ done
 
 if ! quietly az aks show -g "$RG" -n "$AKS_NAME"; then
   step "Check the vCPU quota (needs 4: 2 for the AKS node + 2 for the Jenkins VM)"
-  read -r used limit < <(az vm list-usage -l "$LOCATION" --query "[?name.value=='cores'] | [0].[currentValue, limit]" -o tsv)
-  info "Regional vCPUs in use: $used of $limit"
-  if (( limit - used < 4 )); then
-    echo "Not enough vCPU quota in $LOCATION. Delete other VMs or pick another region." >&2
-    exit 1
-  fi
+  usage="$(az vm list-usage -l "$LOCATION" -o json)"
+  # Both the regional total and the B-series family quota must have 4 vCPUs free
+  for quota in cores standardBSFamily; do
+    used="$(jq -r --arg q "$quota" '.[] | select(.name.value == $q) | .currentValue' <<< "$usage")"
+    limit="$(jq -r --arg q "$quota" '.[] | select(.name.value == $q) | .limit' <<< "$usage")"
+    if [[ ! "$used" =~ ^[0-9]+$ || ! "$limit" =~ ^[0-9]+$ ]]; then
+      echo "Could not read the '$quota' quota for $LOCATION." >&2
+      exit 1
+    fi
+    info "$quota: $used of $limit vCPUs in use"
+    if (( limit - used < 4 )); then
+      echo "Not enough '$quota' vCPU quota in $LOCATION (need 4 free). Pick another region." >&2
+      exit 1
+    fi
+  done
 fi
 
 step "Resource group"

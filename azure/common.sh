@@ -4,7 +4,7 @@
 set -euo pipefail
 
 RG="rg-cicd-demo"
-LOCATION="${LOCATION:-centralindia}"   # another region: LOCATION=southindia bash azure/setup.sh <ip>
+LOCATION="${LOCATION:-eastasia}"       # allowed for this Azure for Students subscription; override: LOCATION=<region>
 AKS_NAME="aks-cicd-demo"
 VM_NAME="vm-jenkins"
 VM_USER="azureuser"
