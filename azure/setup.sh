@@ -32,19 +32,34 @@ for provider in Microsoft.Compute Microsoft.Network Microsoft.ContainerService M
 done
 
 if ! quietly az aks show -g "$RG" -n "$AKS_NAME"; then
-  step "Check the vCPU quota (needs 4: 2 for the AKS node + 2 for the Jenkins VM)"
+  step "Check the VM size is allowed and the vCPU quota (2 for the AKS node + 2 for the Jenkins VM)"
+  declare -A need=([cores]=4)
+  for size in "$NODE_SIZE" "$VM_SIZE"; do
+    sku="$(az vm list-skus -l "$LOCATION" --size "$size" --resource-type virtualMachines -o json |
+      jq -c --arg s "$size" '[.[] | select(.name == $s)][0] // empty')"
+    if [[ -z "$sku" ]]; then
+      echo "VM size $size is not offered in $LOCATION. Change NODE_SIZE/VM_SIZE in azure/common.sh." >&2
+      exit 1
+    fi
+    blocked="$(jq -r '[.restrictions[]?.reasonCode] | join(",")' <<< "$sku")"
+    if [[ -n "$blocked" ]]; then
+      echo "VM size $size is restricted for this subscription in $LOCATION ($blocked)." >&2
+      exit 1
+    fi
+    family="$(jq -r '.family' <<< "$sku")"
+    need[$family]=$(( ${need[$family]:-0} + 2 ))
+  done
   usage="$(az vm list-usage -l "$LOCATION" -o json)"
-  # Both the regional total and the B-series family quota must have 4 vCPUs free
-  for quota in cores standardBSFamily; do
+  for quota in "${!need[@]}"; do
     used="$(jq -r --arg q "$quota" '.[] | select(.name.value == $q) | .currentValue' <<< "$usage")"
     limit="$(jq -r --arg q "$quota" '.[] | select(.name.value == $q) | .limit' <<< "$usage")"
     if [[ ! "$used" =~ ^[0-9]+$ || ! "$limit" =~ ^[0-9]+$ ]]; then
       echo "Could not read the '$quota' quota for $LOCATION." >&2
       exit 1
     fi
-    info "$quota: $used of $limit vCPUs in use"
-    if (( limit - used < 4 )); then
-      echo "Not enough '$quota' vCPU quota in $LOCATION (need 4 free). Pick another region." >&2
+    info "$quota: $used of $limit vCPUs in use (need ${need[$quota]} free)"
+    if (( limit - used < need[$quota] )); then
+      echo "Not enough '$quota' vCPU quota in $LOCATION. Pick another region." >&2
       exit 1
     fi
   done

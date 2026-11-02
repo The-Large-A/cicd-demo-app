@@ -9,8 +9,10 @@ AKS_NAME="aks-cicd-demo"
 VM_NAME="vm-jenkins"
 VM_USER="azureuser"
 NSG_NAME="nsg-jenkins"
-NODE_SIZE="Standard_B2s"              # smallest size AKS accepts for its system node (2 vCPU, 4 GB)
-VM_SIZE="Standard_B2s"
+# 2 vCPU / 4 GB: the smallest size AKS accepts for its system node. Student subscriptions
+# only allow the newer B-series v2 sizes, and B2als_v2 is the cheapest of those that fits.
+NODE_SIZE="Standard_B2als_v2"
+VM_SIZE="Standard_B2als_v2"
 DISK_GB=30
 NAMESPACE="cicd-demo"
 APP_NAME="cicd-demo-app"

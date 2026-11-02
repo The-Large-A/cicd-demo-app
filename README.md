@@ -25,7 +25,7 @@ Built for CIA 2: *Design and Implementation of an End-to-End Cloud-Based CI/CD P
 | Secret scanning | Gitleaks |
 | Container + image scanning | Docker, Trivy |
 | Registry | Azure Container Registry (Basic) |
-| Orchestration | Azure Kubernetes Service (free tier, 1 × Standard_B2s) |
+| Orchestration | Azure Kubernetes Service (free tier, 1 × Standard_B2als_v2) |
 | Configuration management / deployment | Ansible (`ansible/jenkins.yml`, `ansible/deploy.yml`) |
 
 ## Repository layout
