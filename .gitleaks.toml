@@ -1,0 +1,6 @@
+# Gitleaks configuration: use all of Gitleaks' built-in rules (cloud keys, tokens, private keys...).
+# If a finding is a false positive, add its fingerprint to .gitleaksignore with a comment explaining why.
+title = "cicd-demo-app secret scanning"
+
+[extend]
+useDefault = true

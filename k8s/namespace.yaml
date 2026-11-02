@@ -1,0 +1,10 @@
+# Namespace for the app. Applied once by azure/setup.sh (cluster admin).
+# Pod Security "restricted" rejects any pod that runs as root or asks for extra privileges.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cicd-demo
+  labels:
+    app.kubernetes.io/part-of: cicd-demo
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted

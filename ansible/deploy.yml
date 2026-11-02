@@ -1,0 +1,97 @@
+---
+# Deployment automation: rolls out a new image to Kubernetes, checks it, and rolls back on failure.
+# Run by the Jenkins "Deploy" stage:
+#   ansible-playbook ansible/deploy.yml -e app_image=... -e app_version=... -e build_number=... -e git_commit=...
+# Talks to the cluster with the namespace-scoped kubeconfig in $KUBECONFIG.
+# Optional: -e app_url=http://host:port skips the LoadBalancer lookup (used for local testing).
+
+- name: Deploy cicd-demo-app to Kubernetes
+  hosts: local
+  gather_facts: false
+
+  module_defaults:
+    group/kubernetes.core.k8s:
+      kubeconfig: "{{ lookup('ansible.builtin.env', 'KUBECONFIG') | default(omit, true) }}"
+
+  tasks:
+    - name: Check that Jenkins passed in the release details
+      ansible.builtin.assert:
+        that:
+          - app_image is defined
+          - app_version is defined
+          - build_number is defined
+          - git_commit is defined
+        fail_msg: "Pass -e app_image=... -e app_version=... -e build_number=... -e git_commit=..."
+        quiet: true
+
+    - name: Record the deployment time
+      ansible.builtin.set_fact:
+        deployed_at: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
+
+    - name: Deploy and verify (roll back if anything fails)
+      block:
+        - name: Apply the Service
+          kubernetes.core.k8s:
+            state: present
+            src: "{{ manifests_dir }}/service.yaml"
+
+        - name: Apply the Deployment and wait for the rolling update to finish
+          kubernetes.core.k8s:
+            state: present
+            template: "{{ manifests_dir }}/deployment.yaml"
+            wait: true
+            wait_timeout: "{{ rollout_timeout }}"
+
+        - name: Wait for the public IP of the LoadBalancer
+          kubernetes.core.k8s_info:
+            kind: Service
+            name: "{{ app_name }}"
+            namespace: "{{ app_namespace }}"
+          register: service
+          until: service.resources[0].status.loadBalancer.ingress | default([]) | length > 0
+          retries: 30
+          delay: 10
+          when: app_url is not defined
+
+        - name: Work out the application URL
+          ansible.builtin.set_fact:
+            app_url: "http://{{ service.resources[0].status.loadBalancer.ingress[0].ip }}"
+          when: app_url is not defined
+
+        - name: Smoke test - the endpoint serves the new build
+          ansible.builtin.uri:
+            url: "{{ app_url }}/api/status"
+            return_content: true
+          register: status
+          until: >-
+            status.status == 200
+            and status.json.version == app_version
+            and status.json.buildNumber == (build_number | string)
+            and status.json.gitCommit == git_commit[:7]
+          retries: 12
+          delay: 5
+
+        - name: Smoke test - the status page loads
+          ansible.builtin.uri:
+            url: "{{ app_url }}/"
+            return_content: true
+          register: page
+          failed_when: page.status != 200 or 'LIVE' not in page.content
+
+      rescue:
+        - name: Roll back to the previous version
+          kubernetes.core.k8s_rollback:
+            api_version: apps/v1
+            kind: Deployment
+            name: "{{ app_name }}"
+            namespace: "{{ app_namespace }}"
+          # the very first deployment has nothing to roll back to
+          failed_when: false
+
+        - name: Fail the pipeline
+          ansible.builtin.fail:
+            msg: "Deployment of {{ app_image }} failed and was rolled back. See the task output above."
+
+    - name: Show the result
+      ansible.builtin.debug:
+        msg: "Deployed {{ app_image }} (build #{{ build_number }}) - live at {{ app_url }}"

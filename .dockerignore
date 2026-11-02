@@ -1,0 +1,4 @@
+# Send only the built jar to the Docker daemon. Everything else (source, .git,
+# kubeconfigs, credentials, IDE files) stays out of the image and the build context.
+*
+!target/cicd-demo-app.jar

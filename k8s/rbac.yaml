@@ -1,0 +1,51 @@
+# Least-privilege identity for Jenkins. It can only manage the app inside the
+# cicd-demo namespace; it cannot read secrets or touch anything else in the cluster.
+# Applied once by azure/setup.sh, which then builds Jenkins' kubeconfig from the token below.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-deployer
+  namespace: cicd-demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-deployer
+  namespace: cicd-demo
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]           # needed for rollout status and rollback
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer
+  namespace: cicd-demo
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: cicd-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: app-deployer
+---
+# Long-lived token for the service account (Jenkins stores it as a secret file credential)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-deployer-token
+  namespace: cicd-demo
+  annotations:
+    kubernetes.io/service-account.name: jenkins-deployer
+type: kubernetes.io/service-account-token

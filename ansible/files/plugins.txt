@@ -1,0 +1,8 @@
+configuration-as-code
+workflow-aggregator
+git
+github-branch-source
+credentials-binding
+pipeline-stage-view
+junit
+timestamper

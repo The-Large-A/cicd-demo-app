@@ -1,0 +1,4 @@
+# Ansible collections used by deploy.yml
+collections:
+  - name: kubernetes.core
+    version: 6.6.0

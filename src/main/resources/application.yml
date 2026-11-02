@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: cicd-demo-app
+  # Finish in-flight requests before the pod stops (zero-downtime rolling updates)
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: 8080
+  shutdown: graceful
+
+# Values shown on the status page. The pipeline sets the environment variables at deploy time;
+# the defaults are what you see when running locally.
+app:
+  version: "@project.version@"
+  build-number: ${BUILD_NUMBER:local}
+  git-commit: ${GIT_COMMIT:local}
+  deployed-at: ${DEPLOYED_AT:}
+  stage: ${APP_STAGE:Local development}
+  time-zone: Asia/Kolkata
+  rate-limit:
+    requests-per-minute: ${RATE_LIMIT_PER_MINUTE:60}
+
+# Only expose what Kubernetes needs: health (liveness/readiness probes) and info
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

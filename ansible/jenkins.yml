@@ -1,0 +1,288 @@
+---
+# Configuration management: turns a fresh Ubuntu 24.04 VM into the Jenkins CI/CD server.
+# Run from Azure Cloud Shell after azure/setup.sh:
+#   ansible-playbook ansible/jenkins.yml -e @$HOME/cicd-outputs/ansible-vars.yml
+# Idempotent: re-running it only changes what is out of date.
+
+- name: Configure the Jenkins CI/CD server
+  hosts: jenkins
+  become: true
+  # If a later task fails, still restart Jenkins so it never keeps running with stale config
+  force_handlers: true
+
+  vars_prompt:
+    - name: jenkins_admin_password
+      prompt: "Choose a password for the Jenkins 'admin' user (12+ characters)"
+      private: true
+      confirm: true
+
+  pre_tasks:
+    - name: Check the inputs
+      ansible.builtin.assert:
+        that:
+          - jenkins_admin_password | length >= 12
+          - acr_login_server is defined
+          - jenkins_vm_ip is defined
+          - aks_resource_id is defined
+        fail_msg: "Use a 12+ character password and pass -e @$HOME/cicd-outputs/ansible-vars.yml"
+        quiet: true
+
+  handlers:
+    - name: Turn the swap on
+      ansible.builtin.command: swapon /swapfile
+      changed_when: true
+
+    - name: Restart Jenkins
+      ansible.builtin.systemd_service:
+        name: jenkins
+        state: restarted
+        daemon_reload: true
+
+  tasks:
+    # ---------------------------------------------------------------- base system
+    - name: Install base packages (Java 21, Git, Docker)
+      ansible.builtin.apt:
+        name:
+          - openjdk-21-jdk-headless
+          - fontconfig
+          - git
+          - curl
+          - python3-venv
+          - docker.io
+          - docker-buildx
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Make sure Docker is running and starts on boot
+      ansible.builtin.systemd_service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create a swap file (the VM has only 4 GB of RAM)
+      ansible.builtin.shell: >-
+        fallocate -l {{ swap_size_mb }}M /swapfile && chmod 600 /swapfile && mkswap /swapfile
+      args:
+        creates: /swapfile
+      notify: Turn the swap on
+
+    - name: Keep the swap on after a reboot
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: /swapfile none swap sw 0 0
+
+    # ---------------------------------------------------------------- Jenkins
+    - name: Add the Jenkins package signing key
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+        dest: /etc/apt/keyrings/jenkins-keyring.asc
+        mode: "0644"
+
+    - name: Add the Jenkins LTS package repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/jenkins.list
+        content: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/\n"
+        mode: "0644"
+
+    - name: Install Jenkins LTS
+      ansible.builtin.apt:
+        name: jenkins
+        update_cache: true
+
+    - name: Let Jenkins run Docker builds
+      ansible.builtin.user:
+        name: jenkins
+        groups: docker
+        append: true
+      notify: Restart Jenkins
+
+    - name: Create the systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/jenkins.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Skip the setup wizard and load Configuration as Code
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/jenkins.service.d/override.conf
+        content: |
+          [Service]
+          Environment="JAVA_OPTS=-Djava.awt.headless=true -Djenkins.install.runSetupWizard=false -Xmx{{ jenkins_heap }}"
+          Environment="CASC_JENKINS_CONFIG={{ jenkins_home }}/casc.yaml"
+        mode: "0644"
+      notify: Restart Jenkins
+
+    - name: Store the admin password where only Jenkins can read it
+      ansible.builtin.copy:
+        dest: "{{ jenkins_home }}/admin-password"
+        content: "{{ jenkins_admin_password }}"
+        owner: jenkins
+        group: jenkins
+        mode: "0400"
+      no_log: true
+      notify: Restart Jenkins
+
+    - name: Write the Jenkins configuration (Configuration as Code)
+      ansible.builtin.template:
+        src: templates/casc.yaml.j2
+        dest: "{{ jenkins_home }}/casc.yaml"
+        owner: jenkins
+        group: jenkins
+        mode: "0640"
+      notify: Restart Jenkins
+
+    - name: Download the Jenkins plugin installation manager
+      vars:
+        release: "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/{{ plugin_manager_version }}"
+      ansible.builtin.get_url:
+        url: "{{ release }}/jenkins-plugin-manager-{{ plugin_manager_version }}.jar"
+        dest: /opt/jenkins-plugin-manager.jar
+        checksum: "sha256:{{ release }}/jenkins-plugin-manager-{{ plugin_manager_version }}.jar.sha256"
+        mode: "0644"
+
+    - name: Copy the plugin list
+      ansible.builtin.copy:
+        src: files/plugins.txt
+        dest: "{{ jenkins_home }}/plugins.txt"
+        owner: jenkins
+        group: jenkins
+        mode: "0644"
+      register: plugin_list
+
+    - name: Check whether the plugins are installed
+      ansible.builtin.stat:
+        path: "{{ jenkins_home }}/plugins/configuration-as-code.jpi"
+      register: casc_plugin
+
+    - name: Install the plugins and their dependencies
+      ansible.builtin.command: >-
+        java -jar /opt/jenkins-plugin-manager.jar
+        --war /usr/share/java/jenkins.war
+        --plugin-download-directory {{ jenkins_home }}/plugins
+        --plugin-file {{ jenkins_home }}/plugins.txt
+      become: true
+      become_user: jenkins
+      when: plugin_list.changed or not casc_plugin.stat.exists
+      changed_when: true
+      notify: Restart Jenkins
+
+    # ---------------------------------------------------------------- pipeline tools
+    - name: Install kubectl
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        checksum: "sha256:https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl.sha256"
+        mode: "0755"
+
+    - name: Download Gitleaks (secret scanner)
+      ansible.builtin.get_url:
+        url: "https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version }}/gitleaks_{{ gitleaks_version }}_linux_x64.tar.gz"
+        dest: "/tmp/gitleaks_{{ gitleaks_version }}_linux_x64.tar.gz"
+        checksum: "sha256:https://github.com/gitleaks/gitleaks/releases/download/v{{ gitleaks_version }}/gitleaks_{{ gitleaks_version }}_checksums.txt"
+        mode: "0644"
+
+    - name: Install Gitleaks
+      ansible.builtin.unarchive:
+        src: "/tmp/gitleaks_{{ gitleaks_version }}_linux_x64.tar.gz"
+        dest: /usr/local/bin
+        include: [gitleaks]
+        remote_src: true
+        mode: "0755"
+
+    - name: Download Trivy (image vulnerability scanner)
+      ansible.builtin.get_url:
+        url: "https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_Linux-64bit.deb"
+        dest: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
+        checksum: "sha256:https://github.com/aquasecurity/trivy/releases/download/v{{ trivy_version }}/trivy_{{ trivy_version }}_checksums.txt"
+        mode: "0644"
+
+    - name: Install Trivy
+      ansible.builtin.apt:
+        deb: "/tmp/trivy_{{ trivy_version }}_Linux-64bit.deb"
+
+    - name: Copy the Ansible requirement files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ tools_venv }}-{{ item }}"
+        mode: "0644"
+      loop: [requirements.txt, requirements.yml]
+
+    - name: Install the pinned Ansible + Kubernetes client for the Deploy stage
+      ansible.builtin.pip:
+        requirements: "{{ tools_venv }}-requirements.txt"
+        virtualenv: "{{ tools_venv }}"
+        virtualenv_command: python3 -m venv
+
+    - name: Install the kubernetes.core collection
+      ansible.builtin.command: >-
+        {{ tools_venv }}/bin/ansible-galaxy collection install
+        -r {{ tools_venv }}-requirements.yml -p /usr/share/ansible/collections
+      register: galaxy
+      changed_when: "'was installed successfully' in galaxy.stdout"
+
+    - name: Put ansible-playbook on the PATH
+      ansible.builtin.file:
+        src: "{{ tools_venv }}/bin/ansible-playbook"
+        dest: /usr/local/bin/ansible-playbook
+        state: link
+        force: true          # replace any other ansible-playbook so the pipeline uses the pinned one
+
+    # ---------------------------------------------------------------- cost guard
+    - name: Install the nightly "stop AKS" script
+      ansible.builtin.template:
+        src: templates/stop-aks.sh.j2
+        dest: /usr/local/bin/stop-aks.sh
+        mode: "0755"
+
+    - name: Install the nightly "stop AKS" service and timer
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ item.name }}"
+        content: "{{ item.content }}"
+        mode: "0644"
+      loop:
+        - name: stop-aks.service
+          content: |
+            [Unit]
+            Description=Stop the AKS cluster so it cannot run overnight
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/stop-aks.sh
+        - name: stop-aks.timer
+          content: |
+            [Unit]
+            Description=Stop the AKS cluster every night (before the VM's own auto-shutdown)
+            [Timer]
+            OnCalendar=*-*-* {{ aks_nightly_stop_utc }} UTC
+            [Install]
+            WantedBy=timers.target
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Enable the nightly timer
+      ansible.builtin.systemd_service:
+        name: stop-aks.timer
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    # ---------------------------------------------------------------- start and check
+    - name: Apply any pending Jenkins restart
+      ansible.builtin.meta: flush_handlers
+
+    - name: Make sure Jenkins is running and starts on boot
+      ansible.builtin.systemd_service:
+        name: jenkins
+        state: started
+        enabled: true
+
+    - name: Wait until Jenkins answers
+      ansible.builtin.uri:
+        url: http://localhost:8080/login
+      register: login_page
+      until: login_page.status == 200
+      retries: 30
+      delay: 5
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: "Jenkins is ready at http://{{ jenkins_vm_ip }}:8080 (user: admin)"

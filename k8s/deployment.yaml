@@ -1,0 +1,90 @@
+# The app Deployment. Applied by ansible/deploy.yml on every release; the values in double
+# curly braces are filled in by Ansible from the Jenkins build (image, build number, commit, time).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicd-demo-app
+  namespace: cicd-demo
+  labels:
+    app.kubernetes.io/name: cicd-demo-app
+    app.kubernetes.io/version: "{{ app_version }}"
+  annotations:
+    kubernetes.io/change-cause: "Jenkins build #{{ build_number }}, commit {{ git_commit }}"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5                # keep a few old versions for rollback
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cicd-demo-app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1                        # start one new pod at a time...
+      maxUnavailable: 0                  # ...and never drop below 2 ready pods (no downtime)
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cicd-demo-app
+        app.kubernetes.io/version: "{{ app_version }}"
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: "{{ app_image }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: BUILD_NUMBER
+              value: "{{ build_number }}"
+            - name: GIT_COMMIT
+              value: "{{ git_commit }}"
+            - name: DEPLOYED_AT
+              value: "{{ deployed_at }}"
+            - name: APP_STAGE
+              value: "{{ app_stage }}"
+            - name: RATE_LIMIT_PER_MINUTE
+              value: "{{ rate_limit_per_minute }}"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:                  # Spring Boot needs a few seconds to start
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:                # only send traffic once the app is ready
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            periodSeconds: 5
+          livenessProbe:                 # restart the container if it hangs
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp                  # Tomcat needs a writable /tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

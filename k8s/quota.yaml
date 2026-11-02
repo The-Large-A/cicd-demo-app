@@ -1,0 +1,34 @@
+# Hard caps for the namespace, so a mistake can never use up the single small node
+# (or create extra paid load balancers). Applied once by azure/setup.sh.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: cicd-demo-quota
+  namespace: cicd-demo
+spec:
+  hard:
+    pods: "4"                  # 2 replicas + 1 extra during a rolling update, plus headroom
+    requests.cpu: "1"
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    services.loadbalancers: "1"
+---
+# Defaults for any container that does not set its own requests/limits
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cicd-demo-defaults
+  namespace: cicd-demo
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        cpu: 500m
+        memory: 512Mi
+      max:
+        cpu: "1"
+        memory: 768Mi

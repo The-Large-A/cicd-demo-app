@@ -1,0 +1,5 @@
+# Everything runs on Linux (Jenkins VM, Cloud Shell, containers), so store LF line endings
+# even when committing from Windows. Windows batch files keep CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.jar binary

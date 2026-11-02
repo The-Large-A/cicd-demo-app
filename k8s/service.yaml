@@ -1,0 +1,18 @@
+# Public endpoint. On AKS, type LoadBalancer gets an Azure public IP on port 80.
+apiVersion: v1
+kind: Service
+metadata:
+  name: cicd-demo-app
+  namespace: cicd-demo
+  labels:
+    app.kubernetes.io/name: cicd-demo-app
+spec:
+  type: LoadBalancer
+  # Keep the real client IP (needed by the app's per-IP rate limiter)
+  externalTrafficPolicy: Local
+  selector:
+    app.kubernetes.io/name: cicd-demo-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

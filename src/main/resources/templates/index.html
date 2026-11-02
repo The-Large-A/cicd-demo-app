@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>CI/CD Demo App</title>
+	<link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+	<h1>CI/CD Demo App</h1>
+	<table>
+		<tr><th>Status</th><td class="live" th:text="${info.status}">LIVE</td></tr>
+		<tr><th>Version</th><td th:text="${info.version}">1.0.0</td></tr>
+		<tr><th>Build</th><td th:text="'#' + ${info.buildNumber}">#7</td></tr>
+		<tr><th>Commit</th><td th:text="${info.gitCommit}">a1b2c3d</td></tr>
+		<tr><th>Deployed</th><td th:text="${info.deployedAt}">02 Nov 2026, 14:32 IST</td></tr>
+		<tr><th>Pod</th><td th:text="${info.podName}">cicd-demo-app-7f9c4-x2k8p</td></tr>
+		<tr><th>Stage</th><td th:text="${info.stage}">Production (AKS)</td></tr>
+	</table>
+</body>
+</html>

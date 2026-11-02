@@ -1,0 +1,22 @@
+# Jenkins Configuration as Code - written by ansible/jenkins.yml, do not edit on the server.
+jenkins:
+  systemMessage: "CIA 2 CI/CD server (configured by Ansible)"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: "${readFile:{{ jenkins_home }}/admin-password}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: ACR_LOGIN_SERVER
+            value: "{{ acr_login_server }}"
+
+unclassified:
+  location:
+    url: "http://{{ jenkins_vm_ip }}:8080/"

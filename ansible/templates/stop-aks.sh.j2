@@ -1,0 +1,10 @@
+#!/bin/sh
+# Written by ansible/jenkins.yml. Stops the AKS cluster using the VM's managed identity,
+# which azure/setup.sh allowed to manage this one cluster and nothing else.
+set -eu
+TOKEN=$(curl -fsS -H "Metadata: true" \
+  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/" |
+  python3 -c 'import json, sys; print(json.load(sys.stdin)["access_token"])')
+curl -fsS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Length: 0" \
+  "https://management.azure.com{{ aks_resource_id }}/stop?api-version=2024-05-01"
+echo "Requested AKS stop for {{ aks_resource_id }}"

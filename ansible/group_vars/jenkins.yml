@@ -1,0 +1,16 @@
+# Settings for the Jenkins server (jenkins.yml). Tool versions are pinned and every
+# download is checked against the publisher's SHA-256 checksum.
+jenkins_home: /var/lib/jenkins
+jenkins_heap: 1g
+swap_size_mb: 2048
+
+kubectl_version: 1.36.6
+gitleaks_version: 8.30.1
+trivy_version: 0.76.0
+plugin_manager_version: 2.15.0
+
+# Cost guard: stop the AKS cluster every night at 22:45 IST (the VM itself shuts down at 23:00 IST)
+aks_nightly_stop_utc: "17:15"
+
+# Python virtualenv holding the pinned Ansible used by the pipeline's Deploy stage
+tools_venv: /opt/ansible
