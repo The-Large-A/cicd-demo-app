@@ -84,7 +84,9 @@ fi
 
 if budget="$(az rest --method get -o json \
       --url "https://management.azure.com/subscriptions/$SUB_ID/providers/Microsoft.Consumption/budgets/$BUDGET_NAME?api-version=2023-05-01" 2>/dev/null)"; then
-  pass "Budget $BUDGET_NAME: \$$(jq -r .properties.amount <<< "$budget") per month, spent so far \$$(jq -r '.properties.currentSpend.amount // 0' <<< "$budget")"
+  unit="$(jq -r '.properties.currentSpend.unit // ""' <<< "$budget")"
+  spent="$(jq -r '(.properties.currentSpend.amount // 0) * 100 | round / 100' <<< "$budget")"
+  pass "Budget $BUDGET_NAME: $(jq -r .properties.amount <<< "$budget") $unit per month, spent so far $spent $unit"
 else
   warn "Budget $BUDGET_NAME not found"
 fi

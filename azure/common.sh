@@ -17,7 +17,9 @@ DISK_GB=30
 NAMESPACE="cicd-demo"
 APP_NAME="cicd-demo-app"
 BUDGET_NAME="budget-cicd-demo"
-BUDGET_USD=15
+# In the subscription's billing currency: this Azure for Students account bills in INR,
+# so 1300 is about \$15. (Check with: bash azure/check.sh, which prints the currency.)
+BUDGET_AMOUNT=1300
 VM_SHUTDOWN_UTC="1730"                # 23:00 IST
 KEEP_IMAGES=5
 

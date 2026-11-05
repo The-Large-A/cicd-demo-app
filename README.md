@@ -131,7 +131,7 @@ page within a few minutes, with no downtime (rolling update, `maxUnavailable: 0`
 
 | Control | Where |
 |---|---|
-| $15 monthly budget with email alerts at 50 / 80 / 100 % | `azure/setup.sh` |
+| Monthly budget of ₹1,300 (≈ $15; the student account bills in INR) with email alerts at 50 / 80 / 100 % | `azure/setup.sh` |
 | AKS free tier, one small node, 30 GB disk, no monitoring add-on, no autoscaler | `azure/setup.sh` |
 | Jenkins VM shuts down every night at 23:00 IST | `azure/setup.sh` |
 | AKS cluster is stopped every night at 22:45 IST by a timer on the VM | `ansible/jenkins.yml` |

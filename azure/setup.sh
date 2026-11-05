@@ -29,13 +29,13 @@ step "Resource group"
 az group create -n "$RG" -l "$LOCATION" -o none
 info "$RG"
 
-step "Monthly budget of \$$BUDGET_USD with email alerts at 50%, 80% and 100%"
+step "Monthly budget of $BUDGET_AMOUNT (billing currency) with email alerts at 50%, 80% and 100%"
 EMAIL="$(az account show --query user.name -o tsv)"
 cat > "$OUT_DIR/budget.json" <<EOF
 {
   "properties": {
     "category": "Cost",
-    "amount": $BUDGET_USD,
+    "amount": $BUDGET_AMOUNT,
     "timeGrain": "Monthly",
     "timePeriod": { "startDate": "$(date -u +%Y-%m-01)T00:00:00Z" },
     "notifications": {
