@@ -2,13 +2,15 @@
 # The jar is built and tested by Maven earlier in the pipeline; this image only packages
 # that same tested jar ("build once, promote the artifact"). Build it with:
 #   ./mvnw package && docker build -t cicd-demo-app:local .
-FROM eclipse-temurin:24-jre-alpine-3.22
+FROM eclipse-temurin:21.0.13_9-jre-alpine-3.24
 
 LABEL org.opencontainers.image.title="cicd-demo-app" \
       org.opencontainers.image.description="CIA 2 CI/CD demo status page"
 
-# Run as an unprivileged user (UID matches runAsUser in k8s/deployment.yaml)
-RUN addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
+# Apply Alpine security fixes released after the base image was published, then
+# add an unprivileged user (UID matches runAsUser in k8s/deployment.yaml)
+RUN apk upgrade --no-cache \
+ && addgroup -S -g 10001 app && adduser -S -D -H -u 10001 -G app app
 
 WORKDIR /app
 COPY --chown=10001:10001 target/cicd-demo-app.jar app.jar

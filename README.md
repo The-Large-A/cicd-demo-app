@@ -103,7 +103,9 @@ Everything below runs in **Azure Cloud Shell** (portal → `>_` icon → Bash). 
 
 4. **Create the pipeline job**: New Item → name `cicd-demo-app` → **Multibranch Pipeline** →
    Branch Sources → Add source → **GitHub** → credentials `github-token` → repository URL →
-   keep the default behaviours (discover branches and pull requests) → Save.
+   under Behaviours delete *Discover pull requests from forks* and set *Discover pull requests
+   from origin* → Strategy to **Merging the pull request with the current target branch
+   revision** (this reports the `pr-merge` check that `main` requires) → Save.
 
 5. **Add the webhook** in GitHub (repo → Settings → Webhooks → Add webhook):
    payload URL `http://<vm-ip>:8080/github-webhook/`, content type `application/json`,
