@@ -6,6 +6,12 @@ step "This deletes resource group $RG (AKS, ACR, Jenkins VM, IPs, disks) and the
 read -rp "Type the resource group name to confirm: " answer
 [[ "$answer" == "$RG" ]] || { echo "Cancelled."; exit 1; }
 
+step "Remove delete locks (if any)"
+for lock in $(az lock list -g "$RG" --query "[].name" -o tsv); do
+  az lock delete --name "$lock" -g "$RG"
+  info "removed lock $lock"
+done
+
 step "Delete the budget"
 az rest --method delete -o none \
   --url "https://management.azure.com/subscriptions/$SUB_ID/providers/Microsoft.Consumption/budgets/$BUDGET_NAME?api-version=2023-05-01" ||

@@ -17,7 +17,9 @@ DISK_GB=30
 NAMESPACE="cicd-demo"
 APP_NAME="cicd-demo-app"
 BUDGET_NAME="budget-cicd-demo"
-BUDGET_USD=15
+# In the subscription's billing currency: this Azure for Students account bills in INR,
+# so 1300 is about \$15. (Check with: bash azure/check.sh, which prints the currency.)
+BUDGET_AMOUNT=1300
 VM_SHUTDOWN_UTC="1730"                # 23:00 IST
 KEEP_IMAGES=5
 
@@ -32,6 +34,13 @@ ACR_NAME="acrcicd$(echo "$SUB_ID" | tr -d '-' | cut -c1-10)"
 step() { printf '\n\e[1;33m# %s\e[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
 quietly() { "$@" >/dev/null 2>&1; }
+
+# Result helpers for the read-only checks (preflight.sh, check.sh)
+FAILS=0
+WARNS=0
+pass() { printf '  \e[32mPASS\e[0m  %s\n' "$*"; }
+warn() { printf '  \e[33mWARN\e[0m  %s\n' "$*"; WARNS=$((WARNS + 1)); }
+fail() { printf '  \e[31mFAIL\e[0m  %s\n' "$*"; FAILS=$((FAILS + 1)); }
 
 require_ip() {
   if [[ ! "${1:-}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then

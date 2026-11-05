@@ -131,7 +131,7 @@ page within a few minutes, with no downtime (rolling update, `maxUnavailable: 0`
 
 | Control | Where |
 |---|---|
-| $15 monthly budget with email alerts at 50 / 80 / 100 % | `azure/setup.sh` |
+| Monthly budget of ₹1,300 (≈ $15; the student account bills in INR) with email alerts at 50 / 80 / 100 % | `azure/setup.sh` |
 | AKS free tier, one small node, 30 GB disk, no monitoring add-on, no autoscaler | `azure/setup.sh` |
 | Jenkins VM shuts down every night at 23:00 IST | `azure/setup.sh` |
 | AKS cluster is stopped every night at 22:45 IST by a timer on the VM | `ansible/jenkins.yml` |
@@ -141,6 +141,11 @@ page within a few minutes, with no downtime (rolling update, `maxUnavailable: 0`
 | App rate limit: 60 requests/minute per client IP (HTTP 429 beyond that) | `RateLimitFilter.java` |
 
 Start a work session with `bash azure/start.sh` and end it with `bash azure/stop.sh`.
+`bash azure/check.sh` is a read-only health check of everything the project keeps in Azure,
+Kubernetes and Jenkins; it works whether things are running or stopped.
+To stop anything being deleted by accident, lock the resource group (stop/start and deploys
+still work; `teardown.sh` removes the lock for you):
+`az lock create --name keep-project --resource-group rg-cicd-demo --lock-type CanNotDelete`.
 After the viva, `bash azure/teardown.sh` deletes everything.
 
 ## Security

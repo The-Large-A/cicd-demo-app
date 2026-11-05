@@ -4,12 +4,6 @@
 # setup.sh runs it first and stops if anything FAILs.
 source "$(dirname "$0")/common.sh"
 
-FAILS=0
-WARNS=0
-pass() { printf '  \e[32mPASS\e[0m  %s\n' "$*"; }
-warn() { printf '  \e[33mWARN\e[0m  %s\n' "$*"; WARNS=$((WARNS + 1)); }
-fail() { printf '  \e[31mFAIL\e[0m  %s\n' "$*"; FAILS=$((FAILS + 1)); }
-
 # Resources that already exist (from an earlier run) need no new quota
 AKS_EXISTS=false; VM_EXISTS=false
 quietly az aks show -g "$RG" -n "$AKS_NAME" && AKS_EXISTS=true
