@@ -2,7 +2,7 @@
 # The jar is built and tested by Maven earlier in the pipeline; this image only packages
 # that same tested jar ("build once, promote the artifact"). Build it with:
 #   ./mvnw package && docker build -t cicd-demo-app:local .
-FROM eclipse-temurin:21.0.13_9-jre-alpine-3.24
+FROM eclipse-temurin:24-jre-alpine-3.22
 
 LABEL org.opencontainers.image.title="cicd-demo-app" \
       org.opencontainers.image.description="CIA 2 CI/CD demo status page"
