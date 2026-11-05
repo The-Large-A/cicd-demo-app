@@ -13,3 +13,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 2
+    ignore:
+      # Stay on Java 21 (LTS): accept patch updates of the base image, not Java 22/23/24...
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]
