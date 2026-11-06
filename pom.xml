@@ -12,7 +12,7 @@
 	<groupId>com.aarav</groupId>
 	<artifactId>cicd-demo-app</artifactId>
 	<!-- Bump this for every release; it is shown on the page and used in the Docker image tag -->
-	<version>1.0.0</version>
+	<version>1.1.0</version>
 	<name>cicd-demo-app</name>
 	<description>CIA 2 CI/CD demo: a status page deployed by Jenkins to Azure Kubernetes Service</description>
 

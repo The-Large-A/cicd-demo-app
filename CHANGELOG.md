@@ -2,6 +2,15 @@
 
 All notable changes to this project. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-06
+
+### Changed
+- Release 1.1.0 to demonstrate an automatic pipeline redeploy.
+
+### Fixed
+- Base image back on Java 21 LTS after the Java 24 image was blocked by the image scan;
+  Alpine security updates are applied at build time and Dependabot ignores major Java updates.
+
 ## [1.0.0] - 2026-11-02
 
 ### Added
